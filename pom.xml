@@ -36,16 +36,16 @@
     <description>Maven Plugin for compiling JSP sources into bundles</description>
 
     <scm>
-        <connection>scm:svn:http://svn.apache.org/repos/asf/sling/trunk/tooling/maven/maven-jspc-plugin</connection>
-        <developerConnection>scm:svn:https://svn.apache.org/repos/asf/sling/trunk/tooling/maven/maven-jspc-plugin</developerConnection>
-        <url>http://svn.apache.org/viewvc/sling/trunk/tooling/maven/maven-jspc-plugin</url>
+        <connection>scm:git:https://gitbox.apache.org/repos/asf/sling-jspc-maven-plugin.git</conncetion>
+        <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/sling-jspc-maven-plugin.git</developerConnection>
+        <url>https://gitbox.apache.org/repos/asf?p=sling-jspc-maven-plugin.git</url>
     </scm>
 
     <!-- Support for publishing the mvn site. -->
     <distributionManagement>
         <site>
             <id>apache.website</id>
-            <url>scm:svn:https://svn.apache.org/repos/asf/sling/site/trunk/content/components/${maven.site.path}</url>
+            <url>https://gitbox.apache.org/repos/asf?p=sling-jspc-maven-plugin.git</url>
         </site>
     </distributionManagement>
 
