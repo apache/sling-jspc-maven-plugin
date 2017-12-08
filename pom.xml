@@ -34,6 +34,7 @@
 
     <name>Apache Sling Maven JSP Compiler Plugin</name>
     <description>Maven Plugin for compiling JSP sources into bundles</description>
+    <url>https://sling.apache.org/components/jspc-maven-plugin/</url>
 
     <scm>
         <connection>scm:git:https://gitbox.apache.org/repos/asf/sling-jspc-maven-plugin.git</connection>
