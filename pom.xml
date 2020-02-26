@@ -23,7 +23,7 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>30</version>
+        <version>38</version>
         <relativePath />
     </parent>
 
@@ -32,7 +32,7 @@
     <version>2.1.1-SNAPSHOT</version>
     <packaging>maven-plugin</packaging>
 
-    <name>Apache Sling Maven JSP Compiler Plugin</name>
+    <name>Apache Sling JSPC Maven Plugin</name>
     <description>Maven Plugin for compiling JSP sources into bundles</description>
     <url>https://sling.apache.org/components/jspc-maven-plugin/</url>
 
@@ -107,19 +107,14 @@
 
         <dependency>
             <groupId>org.apache.sling</groupId>
-            <artifactId>org.apache.sling.api</artifactId>
-            <version>2.2.2</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.sling</groupId>
             <artifactId>org.apache.sling.scripting.jsp</artifactId>
-            <version>2.3.0</version>
+            <version>2.4.3-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.sling</groupId>
             <artifactId>org.apache.sling.commons.compiler</artifactId>
-            <version>2.3.0</version>
+            <version>2.3.7-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -164,11 +159,6 @@
             <artifactId>maven-archiver</artifactId>
             <version>3.1.1</version>
         </dependency>
-        
-        <dependency>
-            <groupId>org.osgi</groupId>
-            <artifactId>osgi.core</artifactId>
-        </dependency>
 
         <dependency>
             <groupId>org.slf4j</groupId>
@@ -186,6 +176,6 @@
             <artifactId>maven-plugin-annotations</artifactId>
             <version>3.5</version>
             <scope>provided</scope>
-        </dependency>        
+        </dependency>
     </dependencies>
 </project>

@@ -93,6 +93,7 @@ public class JspCTldLocationsCache extends TldLocationsCache {
     private static final String WEB_XML = "/WEB-INF/web.xml";
     private static final String FILE_PROTOCOL = "file:";
     private static final String JAR_FILE_SUFFIX = ".jar";
+    private static final String TLD_SCHEME = "tld:";
 
     // Names of JARs that are known not to contain any TLDs
     private static HashSet<String> noTldJars;
@@ -221,6 +222,27 @@ public class JspCTldLocationsCache extends TldLocationsCache {
             init();
         }
         return mappings.get(uri);
+    }
+
+    @Override
+    public URL getTldLocationURL(String tldLocation) {
+        if (tldLocation.startsWith(TLD_SCHEME)) {
+            tldLocation = tldLocation.substring(TLD_SCHEME.length());
+            String[] locationInfo = mappings.get(tldLocation);
+            if (locationInfo != null) {
+                try {
+                    if (locationInfo.length == 2) {
+                        return new URL("jar:" + locationInfo[0] + "!/" + locationInfo[1]);
+                    } else if (locationInfo.length == 1) {
+                        return new URL(locationInfo[0]);
+                    }
+                } catch (MalformedURLException e) {
+                    log.warn("Cannot retrieve TLD location url for " + tldLocation + ".");
+                    log.debug("Details:", e);
+                }
+            }
+        }
+        return null;
     }
 
     /**
