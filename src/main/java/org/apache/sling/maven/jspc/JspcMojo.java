@@ -44,6 +44,7 @@ import org.apache.maven.project.MavenProject;
 import org.apache.sling.commons.classloader.ClassLoaderWriter;
 import org.apache.sling.commons.compiler.JavaCompiler;
 import org.apache.sling.commons.compiler.impl.EclipseJavaCompiler;
+import org.apache.sling.scripting.jsp.jasper.Constants;
 import org.apache.sling.scripting.jsp.jasper.IOProvider;
 import org.apache.sling.scripting.jsp.jasper.JasperException;
 import org.apache.sling.scripting.jsp.jasper.JspCompilationContext;
@@ -142,10 +143,10 @@ public class JspcMojo extends AbstractMojo implements Options {
     private String jspFileExtensions;
 
     /**
-     * @deprecated Due to internal refactoring, this is not longer supported.
+     * When defined, this will set the value for the {@link org.apache.sling.scripting.jsp.jasper.Constants#JSP_PACKAGE_NAME_PROPERTY_NAME}
+     * system property of the Jasper compiler, which defines the prefix package under which compiled JSPs will be generated.
      */
-    @Deprecated
-    @Parameter ( property = "jspc.servletPackage", defaultValue = "org.apache.jsp")
+    @Parameter(property = "jspc.servletPackage")
     private String servletPackage;
 
     /**
@@ -209,10 +210,13 @@ public class JspcMojo extends AbstractMojo implements Options {
         }
 
         // have the files compiled
+        String previousJasperPackageName = null;
         String oldValue = System.getProperty(LogFactoryImpl.LOG_PROPERTY);
         try {
             // ensure the JSP Compiler does not try to use Log4J
             System.setProperty(LogFactoryImpl.LOG_PROPERTY, SimpleLog.class.getName());
+            previousJasperPackageName =
+                    System.setProperty(Constants.JSP_PACKAGE_NAME_PROPERTY_NAME, (servletPackage != null ? servletPackage : ""));
             executeInternal();
             if (printCompilationReport) {
                 printCompilationReport();
@@ -225,6 +229,11 @@ public class JspcMojo extends AbstractMojo implements Options {
                 System.clearProperty(LogFactoryImpl.LOG_PROPERTY);
             } else {
                 System.setProperty(LogFactoryImpl.LOG_PROPERTY, oldValue);
+            }
+            if (previousJasperPackageName == null) {
+                System.clearProperty(Constants.JSP_PACKAGE_NAME_PROPERTY_NAME);
+            } else {
+                System.setProperty(Constants.JSP_PACKAGE_NAME_PROPERTY_NAME, previousJasperPackageName);
             }
         }
 
