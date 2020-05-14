@@ -110,6 +110,9 @@ public class JspcMojo extends AbstractMojo implements Options {
     @Parameter ( property = "jspc.jasper.trimSpaces", defaultValue = "false")
     private boolean jasperTrimSpaces;
 
+    @Parameter ( property = "jspc.jasper.suppressSmap", defaultValue = "false")
+    private boolean jasperSuppressSmap;
+
     @Parameter ( property = "jspc.failOnError", defaultValue = "true")
     private boolean failOnError;
 
@@ -285,7 +288,7 @@ public class JspcMojo extends AbstractMojo implements Options {
                     + uriSourceRoot + "' must be an existing directory");
             }
 
-            for (String nextjsp : pages) {
+            pages.stream().parallel().forEach(nextjsp -> {
                 File fjsp = new File(nextjsp);
                 if (!fjsp.isAbsolute()) {
                     fjsp = new File(uriRootF, nextjsp);
@@ -294,18 +297,22 @@ public class JspcMojo extends AbstractMojo implements Options {
                     if (getLog().isWarnEnabled()) {
                         getLog().warn("JSP file " + fjsp + " does not exist");
                     }
-                    continue;
-                }
-                String s = fjsp.getAbsolutePath();
-                if (s.startsWith(uriSourceRoot)) {
-                    nextjsp = s.substring(uriSourceRoot.length());
-                }
-                if (nextjsp.startsWith("." + File.separatorChar)) {
-                    nextjsp = nextjsp.substring(2);
-                }
+                } else {
+                    String s = fjsp.getAbsolutePath();
+                    if (s.startsWith(uriSourceRoot)) {
+                        nextjsp = s.substring(uriSourceRoot.length());
+                    }
+                    if (nextjsp.startsWith("." + File.separatorChar)) {
+                        nextjsp = nextjsp.substring(2);
+                    }
 
-                processFile(nextjsp);
-            }
+                    try {
+                        processFile(nextjsp);
+                    } catch (JasperException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
 
         } catch (JasperException je) {
             Throwable rootCause = je;
@@ -741,7 +748,7 @@ public class JspcMojo extends AbstractMojo implements Options {
      */
     public boolean isSmapSuppressed() {
         // require SMAP
-        return false;
+        return jasperSuppressSmap;
     }
 
     /*
