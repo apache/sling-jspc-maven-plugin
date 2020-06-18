@@ -1,0 +1,51 @@
+#set($h1 = '#')
+#set($h2 = '##')
+#set($h3 = '###')
+#set($h4 = '####')
+
+The Apache Sling JSPC Maven Plugin Compiles JSP scripts into class files.
+
+See [Goals](plugin-info.html) for a list of supported goals.
+
+$h2 Overview
+
+The JSPC Maven Plugin provides a single goal `jspc` which is by default executed in the `compile` phase of the Maven build process. This
+goal takes all JSP source files from a configured location (`src/main/scripts` by default) and compiles them into classes in a
+configurable location (`target/classes` by default).
+
+$h2 Usage
+
+To use the JSPC Maven Plugin define the following elements in the `<plugins>` section of the POM:
+
+```
+<project>
+    ....
+    <build>
+        ....
+        <plugins>
+            ....
+            <plugin>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>${project.artifactId}</artifactId>
+                <version>${project.version}</version>
+                <executions>
+                    <execution>
+                        <id>compile-jsp</id>
+                        <goals>
+                            <goal>jspc</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            ....
+        <plugins>
+        ....
+    <build>
+    ....
+<project>
+```
+
+## Notes
+
+The generated JSP classes are automatically copied to the generated bundle jar file if the Maven Bundle Plugin is used to build the project
+package.

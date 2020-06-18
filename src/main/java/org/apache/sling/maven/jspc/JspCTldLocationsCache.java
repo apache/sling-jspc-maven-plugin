@@ -50,12 +50,12 @@ import org.xml.sax.InputSource;
  * for the web application.
  *
  * Tag Libraries can be defined globally in one of two ways:
- *   1. Via <taglib> elements in web.xml:
+ *   1. Via &lt;taglib&gt; elements in web.xml:
  *      the uri and location of the tag-library are specified in
- *      the <taglib> element.
+ *      the &lt;taglib&gt; element.
  *   2. Via packaged jar files that contain .tld files
  *      within the META-INF directory, or some subdirectory
- *      of it. The taglib is 'global' if it has the <uri>
+ *      of it. The taglib is 'global' if it has the &lt;uri&gt;
  *      element defined.
  *
  * A mapping between the taglib URI and its associated TaglibraryInfoImpl
@@ -167,15 +167,14 @@ public class JspCTldLocationsCache extends TldLocationsCache {
         noTldJars.add("sunpkcs11.jar");
     }
 
-    /** Constructor.
+    /**
+     * Constructor.
      *
-     * @param ctxt the servlet context of the web application in which Jasper
-     * is running
-     * @param redeployMode if true, then the compiler will allow redeploying
-     * a tag library from the same jar, at the expense of slowing down the
-     * server a bit. Note that this may only work on JDK 1.3.1_01a and later,
-     * because of JDK bug 4211817 fixed in this release.
-     * If redeployMode is false, a faster but less capable mode will be used.
+     * @param ctxt         the servlet context of the web application in which Jasper is running
+     * @param redeployMode if true, then the compiler will allow redeploying a tag library from the same jar, at the expense of slowing down
+     *                     the server a bit. Note that this may only work on JDK 1.3.1_01a and later, because of JDK bug 4211817 fixed in
+     *                     this release. If redeployMode is false, a faster but less capable mode will be used.
+     * @param loader       the classloader to use
      */
     public JspCTldLocationsCache(ServletContext ctxt, boolean redeployMode, ClassLoader loader) {
         this.ctxt = ctxt;
@@ -250,6 +249,9 @@ public class JspCTldLocationsCache extends TldLocationsCache {
      *     ABS_URI
      *     ROOT_REL_URI
      *     NOROOT_REL_URI
+     *
+     * @param uri the URI for which to return the type
+     * @return the URI type
      */
     public static int uriType(String uri) {
         if (uri.indexOf(':') != -1) {
@@ -364,7 +366,7 @@ public class JspCTldLocationsCache extends TldLocationsCache {
     /**
      * Scans the given JarURLConnection for TLD files located in META-INF
      * (or a subdirectory of it), adding an implicit map entry to the taglib
-     * map for any TLD that has a <uri> element.
+     * map for any TLD that has a &lt;uri&gt; element.
      *
      * @param conn The JarURLConnection to the JAR file to scan
      * @param ignore true if any exceptions raised when processing the given
@@ -434,7 +436,7 @@ public class JspCTldLocationsCache extends TldLocationsCache {
 
     /*
      * Searches the filesystem under /WEB-INF for any TLD files, and adds
-     * an implicit map entry to the taglib map for any TLD that has a <uri>
+     * an implicit map entry to the taglib map for any TLD that has a &lt;uri&gt;
      * element.
      */
     private void processTldsInFileSystem(String startPath)

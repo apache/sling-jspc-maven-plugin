@@ -27,13 +27,12 @@
         <relativePath />
     </parent>
 
-    <groupId>org.apache.sling</groupId>
     <artifactId>jspc-maven-plugin</artifactId>
     <version>2.1.1-SNAPSHOT</version>
     <packaging>maven-plugin</packaging>
 
     <name>Apache Sling JSPC Maven Plugin</name>
-    <description>Maven Plugin for compiling JSP sources into bundles</description>
+    <description>Maven Plugin for compiling JSP files into Java classes</description>
     <url>https://sling.apache.org/components/jspc-maven-plugin/</url>
 
     <scm>
@@ -44,6 +43,7 @@
 
     <properties>
         <maven.site.path>${project.artifactId}-archives/${project.artifactId}-LATEST</maven.site.path>
+        <site.jira.version.id>12313225,12313347,12319479,12319561,12325751,12347153</site.jira.version.id>
     </properties>
 
     <build>
@@ -99,6 +99,16 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-plugin-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-changes-plugin</artifactId>
+                <configuration>
+                    <useJql>true</useJql>
+                    <sortColumnNames>resolutiondate DESC</sortColumnNames>
+                    <columnNames>Type,Key,Summary,Fix Version</columnNames>
+                    <resolutionIds>Fixed</resolutionIds>
+                </configuration>
             </plugin>
         </plugins>
     </reporting>

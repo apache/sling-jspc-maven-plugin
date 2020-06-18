@@ -122,13 +122,13 @@ public class JspcMojo extends AbstractMojo implements Options {
     /**
      * The Target Virtual Machine Version to generate class files for.
      */
-    @Parameter ( property = "jspc.compilerTargetVM", defaultValue = "1.5")
+    @Parameter ( property = "jspc.compilerTargetVM", defaultValue = "1.8")
     private String compilerTargetVM;
 
     /**
      * The Compiler Source Version of the Java source generated from the JSP files before compiling into classes.
      */
-    @Parameter ( property = "jspc.compilerSourceVM", defaultValue = "1.5")
+    @Parameter ( property = "jspc.compilerSourceVM", defaultValue = "1.8")
     private String compilerSourceVM;
 
     /**
