@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
@@ -96,7 +97,7 @@ public class JspCTldLocationsCache extends TldLocationsCache {
     private static final String TLD_SCHEME = "tld:";
 
     // Names of JARs that are known not to contain any TLDs
-    private static HashSet<String> noTldJars;
+    private static final HashSet<String> noTldJars;
 
     /**
      * The mapping of the 'global' tag library URI to the location (resource
@@ -105,13 +106,14 @@ public class JspCTldLocationsCache extends TldLocationsCache {
      *    [0] The location
      *    [1] If the location is a jar file, this is the location of the tld.
      */
-    private Map<String, String[]> mappings;
+    private final Map<String, String[]> mappings;
 
-    private boolean initialized;
-    private ServletContext ctxt;
-    private boolean redeployMode;
+    private final ServletContext ctxt;
+    private final boolean redeployMode;
 
     private final ClassLoader webappLoader;
+
+    private volatile boolean initialized;
 
     //*********************************************************************
     // Constructor and Initilizations
@@ -179,7 +181,7 @@ public class JspCTldLocationsCache extends TldLocationsCache {
     public JspCTldLocationsCache(ServletContext ctxt, boolean redeployMode, ClassLoader loader) {
         this.ctxt = ctxt;
         this.redeployMode = redeployMode;
-        mappings = new HashMap<String, String[]>();
+        mappings = new ConcurrentHashMap<>();
         initialized = false;
         this.webappLoader = loader;
     }
@@ -227,7 +229,14 @@ public class JspCTldLocationsCache extends TldLocationsCache {
     public URL getTldLocationURL(String tldLocation) {
         if (tldLocation.startsWith(TLD_SCHEME)) {
             tldLocation = tldLocation.substring(TLD_SCHEME.length());
-            String[] locationInfo = mappings.get(tldLocation);
+            String[] locationInfo = null;
+
+            try {
+                locationInfo = getLocation(tldLocation);
+            } catch (JasperException ex) {
+                log.error("Cannot retrieve TLD location url for " + tldLocation + ".");
+                log.debug("Details:", ex);
+            }
             if (locationInfo != null) {
                 try {
                     if (locationInfo.length == 2) {
@@ -263,7 +272,7 @@ public class JspCTldLocationsCache extends TldLocationsCache {
         }
     }
 
-    private void init() throws JasperException {
+    private synchronized void init() throws JasperException {
         if (initialized) return;
         try {
             processWebDotXml();
