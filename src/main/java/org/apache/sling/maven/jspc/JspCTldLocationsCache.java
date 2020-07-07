@@ -278,6 +278,7 @@ public class JspCTldLocationsCache extends TldLocationsCache {
             processWebDotXml();
             scanJars();
             processTldsInFileSystem("/WEB-INF/");
+            processTldsInFileSystem("/META-INF/");
             initialized = true;
         } catch (Exception ex) {
             throw new JasperException(Localizer.getMessage(
