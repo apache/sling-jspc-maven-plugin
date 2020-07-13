@@ -44,7 +44,7 @@
 
     <properties>
         <maven.site.path>${project.artifactId}-archives/${project.artifactId}-LATEST</maven.site.path>
-        <site.jira.version.id>12313225,12313347,12319479,12319561,12325751,12347153</site.jira.version.id>
+        <site.jira.version.id>12313225,12313347,12319479,12319561,12325751,12347153,12348438,12348556</site.jira.version.id>
     </properties>
 
     <build>
