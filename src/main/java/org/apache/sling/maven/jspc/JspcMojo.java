@@ -34,6 +34,7 @@ import org.apache.commons.logging.impl.LogFactoryImpl;
 import org.apache.commons.logging.impl.SimpleLog;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
+import org.apache.maven.model.Repository;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
@@ -405,7 +406,7 @@ public class JspcMojo extends AbstractMojo implements Options {
         classPath.add(new File(targetDirectory).toURI().toURL());
 
         // add artifacts from project
-        Set<Artifact> artifacts = project.getDependencyArtifacts();
+        Set<Artifact> artifacts = project.getArtifacts();
         jspcCompileArtifacts = new ArrayList<Artifact>(artifacts.size());
         for (Artifact a: artifacts) {
             final String scope = a.getScope();
