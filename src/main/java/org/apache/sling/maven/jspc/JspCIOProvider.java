@@ -21,6 +21,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URL;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.sling.commons.classloader.ClassLoaderWriter;
@@ -55,8 +56,23 @@ public class JspCIOProvider implements IOProvider {
     }
 
     @Override
-    public InputStream getInputStream(String fileName) throws FileNotFoundException, IOException {
-        return FileUtils.openInputStream(getFile(fileName));
+    public InputStream getInputStream(String fileName) throws IOException {
+        File file = getFile(fileName);
+        if (file.exists()) {
+            return FileUtils.openInputStream(getFile(fileName));
+        }
+        // coming from a jar; remove the leading slash
+        String jarEntryPath;
+        if (fileName.startsWith("/")) {
+            jarEntryPath = fileName.substring(1);
+        } else {
+            jarEntryPath = fileName;
+        }
+        URL url = loader.getResource(jarEntryPath);
+        if (url != null) {
+            return url.openStream();
+        }
+        throw new FileNotFoundException("Cannot find file " + fileName + ".");
     }
 
     @Override

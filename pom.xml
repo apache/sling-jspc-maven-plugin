@@ -23,7 +23,7 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>38</version>
+        <version>40</version>
         <relativePath />
     </parent>
 
@@ -40,12 +40,17 @@
         <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/sling-jspc-maven-plugin.git</developerConnection>
         <url>https://gitbox.apache.org/repos/asf?p=sling-jspc-maven-plugin.git</url>
       <tag>HEAD</tag>
-  </scm>
+    </scm>
 
     <properties>
         <maven.site.path>${project.artifactId}-archives/${project.artifactId}-LATEST</maven.site.path>
         <site.jira.version.id>12313225,12313347,12319479,12319561,12325751,12347153,12348438,12348556</site.jira.version.id>
+        <maven.version>3.5.0</maven.version>
     </properties>
+
+    <prerequisites>
+        <maven>${maven.version}</maven>
+    </prerequisites>
 
     <build>
         <plugins>
@@ -71,6 +76,7 @@
                 <configuration>
                     <excludes>
                         <exclude>src/site/markdown/**</exclude>
+                        <exclude>src/test/resources/jspc-maven-plugin-it-includes/target/**</exclude>
                     </excludes>
                 </configuration>
             </plugin>
@@ -113,6 +119,38 @@
             </plugin>
         </plugins>
     </reporting>
+
+    <!-- force maven-plugin-testing-harness to use newer plexus container (https://issues.apache.org/jira/browse/MPLUGINTESTING-53) -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- maven -->
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-core</artifactId>
+                <version>${maven.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-compat</artifactId>
+                <version>${maven.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-model</artifactId>
+                <version>${maven.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-plugin-api</artifactId>
+                <version>${maven.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.maven</groupId>
+                <artifactId>maven-aether-provider</artifactId>
+                <version>${maven.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
 
@@ -163,7 +201,14 @@
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-plugin-api</artifactId>
-            <version>3.5.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-model</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-core</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
@@ -187,6 +232,37 @@
             <artifactId>maven-plugin-annotations</artifactId>
             <version>3.5</version>
             <scope>provided</scope>
+        </dependency>
+
+        <!-- Testing Dependencies -->
+        <dependency>
+            <groupId>org.codehaus.plexus</groupId>
+            <artifactId>plexus-container-default</artifactId>
+            <version>1.6</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>3.5.11</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven.plugin-testing</groupId>
+            <artifactId>maven-plugin-testing-harness</artifactId>
+            <version>3.3.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven</groupId>
+            <artifactId>maven-compat</artifactId>
+            <scope>test</scope>
+            <version>${maven.version}</version>
         </dependency>
     </dependencies>
 </project>

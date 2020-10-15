@@ -405,7 +405,7 @@ public class JspcMojo extends AbstractMojo implements Options {
         classPath.add(new File(targetDirectory).toURI().toURL());
 
         // add artifacts from project
-        Set<Artifact> artifacts = project.getDependencyArtifacts();
+        Set<Artifact> artifacts = project.getArtifacts();
         jspcCompileArtifacts = new ArrayList<Artifact>(artifacts.size());
         for (Artifact a: artifacts) {
             final String scope = a.getScope();
