@@ -530,8 +530,7 @@ public class JspcMojo extends AbstractMojo implements Options {
      * @param a the artifact to scan
      */
     private void scanArtifactPackages(Map<String, Set<String>> artifactsByPackage, Artifact a) {
-        try {
-            JarFile jar = new JarFile(a.getFile());
+        try (JarFile jar = new JarFile(a.getFile())) {
             Enumeration<JarEntry> entries = jar.entries();
             while (entries.hasMoreElements()) {
                 JarEntry e = entries.nextElement();
