@@ -21,12 +21,24 @@ package org.apache.sling.maven.jspc;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
+
+import javax.json.Json;
+import javax.json.JsonArray;
+import javax.json.JsonObject;
+import javax.json.JsonReader;
+import javax.json.JsonString;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.maven.artifact.repository.ArtifactRepositoryPolicy;
 import org.apache.maven.artifact.repository.DefaultArtifactRepository;
+import org.apache.maven.artifact.repository.MavenArtifactRepository;
 import org.apache.maven.artifact.repository.layout.DefaultRepositoryLayout;
 import org.apache.maven.execution.DefaultMavenExecutionRequest;
 import org.apache.maven.execution.MavenExecutionRequest;
@@ -36,12 +48,16 @@ import org.apache.maven.plugin.testing.MojoRule;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuilder;
 import org.apache.maven.project.ProjectBuildingRequest;
+import org.apache.maven.repository.UserLocalArtifactRepository;
+import org.eclipse.aether.DefaultRepositorySystemSession;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 
@@ -92,6 +108,44 @@ public class JspcMojoTest {
             line = bufferedReader.readLine();
         }
         assertTrue("Some files were not correctly included: " + expectedContent.toString(), expectedContent.isEmpty());
+    }
+
+    @Test
+    public void testCompilationReport() throws Exception {
+        jspcMojo.execute();
+        Path compilationReportPath = Paths.get(mavenProject.getBuild().getOutputDirectory(), "compilation_report.json");
+        try (JsonReader reader = Json.createReader(Files.newBufferedReader(compilationReportPath))) {
+            JsonObject compilationReport = reader.readObject();
+
+            JsonArray unusedDependencies = compilationReport.getJsonArray("unusedDependencies");
+            assertNotNull(unusedDependencies);
+            assertTrue(unusedDependencies.isEmpty());
+
+            JsonArray jspDependencies = compilationReport.getJsonArray("jspDependencies");
+            assertNotNull(jspDependencies);
+            assertEquals(1, jspDependencies.size());
+            JsonObject mainJsp = jspDependencies.getJsonObject(0);
+            assertEquals("src/main/scripts/main.jsp", mainJsp.getString("jsp"));
+            JsonArray mainJspDependencies = mainJsp.getJsonArray("dependencies");
+            assertNotNull(mainJspDependencies);
+            assertEquals(3, mainJspDependencies.size());
+
+            assertEquals(new HashSet<>(Arrays.asList("jspc-maven-plugin-it-includes-deps-0.0.1.jar:/libs/l1/l2/included-cp.jsp", "jspc" +
+                    "-maven-plugin-it-includes-deps-0.0.1.jar:/included-cp.jsp", "src/main/scripts/included-fs.jsp")),
+                    new HashSet<>(mainJspDependencies.getValuesAs(JsonString.class).stream().map(JsonString::getString).collect(
+                            Collectors.toList())));
+
+            JsonArray packageProviders = compilationReport.getJsonArray("packageProviders");
+            assertNotNull(packageProviders);
+            assertEquals(1, packageProviders.size());
+
+            JsonObject provider = packageProviders.getJsonObject(0);
+            assertEquals("org.apache.sling.maven.jspc.it", provider.getString("package"));
+            JsonArray providers = provider.getJsonArray("providers");
+            assertNotNull(providers);
+            assertEquals(1, providers.size());
+            assertEquals("org.apache.sling:jspc-maven-plugin-it-deps:jar:0.0.1", providers.getString(0));
+        }
     }
 
 }

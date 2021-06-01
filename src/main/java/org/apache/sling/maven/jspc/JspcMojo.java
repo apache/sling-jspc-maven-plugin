@@ -19,16 +19,25 @@ package org.apache.sling.maven.jspc;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+
+import javax.json.Json;
+import javax.json.JsonArrayBuilder;
+import javax.json.JsonObject;
+import javax.json.JsonObjectBuilder;
+import javax.json.JsonWriter;
+import javax.json.JsonWriterFactory;
+import javax.json.stream.JsonGenerator;
 
 import org.apache.commons.logging.impl.LogFactoryImpl;
 import org.apache.commons.logging.impl.SimpleLog;
@@ -45,12 +54,12 @@ import org.apache.sling.commons.classloader.ClassLoaderWriter;
 import org.apache.sling.commons.compiler.JavaCompiler;
 import org.apache.sling.commons.compiler.impl.EclipseJavaCompiler;
 import org.apache.sling.scripting.jsp.jasper.Constants;
-import org.apache.sling.scripting.jsp.jasper.IOProvider;
 import org.apache.sling.scripting.jsp.jasper.JasperException;
 import org.apache.sling.scripting.jsp.jasper.JspCompilationContext;
 import org.apache.sling.scripting.jsp.jasper.Options;
 import org.apache.sling.scripting.jsp.jasper.compiler.JspConfig;
 import org.apache.sling.scripting.jsp.jasper.compiler.JspRuntimeContext;
+import org.apache.sling.scripting.jsp.jasper.compiler.PageInfo;
 import org.apache.sling.scripting.jsp.jasper.compiler.TagPluginManager;
 import org.apache.sling.scripting.jsp.jasper.compiler.TldLocationsCache;
 import org.codehaus.plexus.util.DirectoryScanner;
@@ -138,6 +147,44 @@ public class JspcMojo extends AbstractMojo implements Options {
     private boolean printCompilationReport;
 
     /**
+     * Generates a compilation report text file (compilation_report.json) in the {@code ${project.build.outputDirectory}}.
+     *
+     * <p>
+     *     The compilation report has the following format:
+     *     <pre>
+     *     {
+     *         "packageProviders": [
+     *             {
+     *                 "package": "&lt;a Java package name&gt;",
+     *                 "providers": [
+     *                     "&lt;Maven Artifact ID&gt;"
+     *                 ]
+     *             }
+     *         ],
+     *         "jspDependencies": [
+     *             {
+     *                 "jsp": "src/main/scripts/&lt;a script&gt;.jsp",
+     *                 "dependencies": [
+     *                     "&lt;jar file name&gt;:&lt;path to JSP&gt;",
+     *                     "src/main/scripts/&lt;path to file in local project&gt;.jsp"
+     *                 ]
+     *             }
+     *         ],
+     *         "unusedDependencies": [
+     *             "&lt;Maven Artifact ID&gt;"
+     *         ]
+     *      }
+     *     </pre>
+     * </p>
+     *
+     * @since 2.3.0
+     */
+    @Parameter(property = "jspc.generateCompilationReport", defaultValue = "false")
+    private boolean generateCompilationReport;
+
+    private static final String COMPILATION_REPORT = "compilation_report.json";
+
+    /**
      * Comma separated list of extensions of files to be compiled by the plugin.
      * @deprecated Use the {@link #includes} filter instead.
      */
@@ -185,6 +232,10 @@ public class JspcMojo extends AbstractMojo implements Options {
 
     private TagPluginManager tagPluginManager;
 
+    private JspCIOProvider ioProvider;
+
+    private DependencyTracker dependencyTracker;
+
     /*
      * (non-Javadoc)
      *
@@ -221,8 +272,13 @@ public class JspcMojo extends AbstractMojo implements Options {
             previousJasperPackageName =
                     System.setProperty(Constants.JSP_PACKAGE_NAME_PROPERTY_NAME, (servletPackage != null ? servletPackage : ""));
             executeInternal();
-            if (printCompilationReport) {
-                printCompilationReport();
+            if (dependencyTracker != null) {
+                if (printCompilationReport) {
+                    printCompilationReport(dependencyTracker);
+                }
+                if (generateCompilationReport) {
+                    generateCompilationReport(dependencyTracker);
+                }
             }
         } catch (JasperException je) {
             getLog().error("Compilation Failure", je);
@@ -273,6 +329,17 @@ public class JspcMojo extends AbstractMojo implements Options {
                 initServletContext();
             }
 
+
+            if (printCompilationReport || generateCompilationReport) {
+                dependencyTracker = new DependencyTracker(
+                        getLog(),
+                        project.getBasedir().toPath(),
+                        sourceDirectory.toPath(),
+                        context,
+                        loader,
+                        jspcCompileArtifacts);
+            }
+
             if (includes == null) {
                 includes = new String[]{ "**/*.jsp" };
             }
@@ -313,6 +380,9 @@ public class JspcMojo extends AbstractMojo implements Options {
                     }
                 }
             });
+            if (dependencyTracker != null) {
+                dependencyTracker.processCompileDependencies();
+            }
 
         } catch (JasperException je) {
             Throwable rootCause = je;
@@ -335,7 +405,11 @@ public class JspcMojo extends AbstractMojo implements Options {
             final String jspUri = file.replace('\\', '/');
             final JspCompilationContext clctxt = new JspCompilationContext(jspUri, false, this, context, rctxt, false);
 
-            JasperException error = clctxt.compile();
+            JasperException error = clctxt.compile(true);
+            PageInfo pageInfo = clctxt.getCompiler().getPageInfo();
+            if (pageInfo != null && dependencyTracker != null) {
+                dependencyTracker.collectJSPInfo(file, pageInfo);
+            }
             if (error != null) {
                 throw error;
             }
@@ -384,7 +458,7 @@ public class JspcMojo extends AbstractMojo implements Options {
 
         JavaCompiler compiler = new EclipseJavaCompiler();
         ClassLoaderWriter writer = new JspCClassLoaderWriter(loader, new File(outputDirectory));
-        IOProvider ioProvider = new JspCIOProvider(loader, compiler, writer);
+        ioProvider = new JspCIOProvider(loader, compiler, writer);
         rctxt = new JspRuntimeContext(context, this, ioProvider);
         jspConfig = new JspConfig(context);
         tagPluginManager = new TagPluginManager(context);
@@ -448,39 +522,27 @@ public class JspcMojo extends AbstractMojo implements Options {
     /**
      * Prints the dependency report.
      */
-    private void printCompilationReport() {
-        if (loader == null) {
-            return;
-        }
-
-        // first scan all the dependencies for their classes
-        Map<String, Set<String>> artifactsByPackage = new HashMap<String, Set<String>>();
-        Set<String> usedDependencies = new HashSet<String>();
-        for (Artifact a: jspcCompileArtifacts) {
-            scanArtifactPackages(artifactsByPackage, a);
-            usedDependencies.add(a.getId());
-        }
-
-        // create the report
+    private void printCompilationReport(DependencyTracker dependencyTracker) {
         StringBuilder report = new StringBuilder("JSP compilation report:\n\n");
-        List<String> packages = new ArrayList<String>(loader.getPackageNames());
         int pad = 10;
-        for (String packageName: artifactsByPackage.keySet()) {
+        Map<String, Set<String>> packageProviders = dependencyTracker.getPackageProviders();
+        List<String> packages = new ArrayList<>(packageProviders.keySet());
+        for (String packageName: packages) {
             pad = Math.max(pad, packageName.length());
         }
         pad += 2;
         report.append(StringUtils.rightPad("Package", pad)).append("Dependency");
         report.append("\n---------------------------------------------------------------\n");
+
         Collections.sort(packages);
         for (String packageName: packages) {
             report.append(StringUtils.rightPad(packageName, pad));
-            Set<String> a = artifactsByPackage.get(packageName);
-            if (a == null || a.isEmpty()) {
+            Set<String> artifacts = packageProviders.get(packageName);
+            if (artifacts == null || artifacts.isEmpty()) {
                 report.append("n/a");
             } else {
                 StringBuilder ids = new StringBuilder();
-                for (String id: a) {
-                    usedDependencies.remove(id);
+                for (String id: artifacts) {
                     if (ids.length() > 0) {
                         ids.append(", ");
                     }
@@ -493,10 +555,11 @@ public class JspcMojo extends AbstractMojo implements Options {
 
         // print the unused dependencies
         report.append("\n");
-        report.append(usedDependencies.size()).append(" dependencies not used by JSPs:\n");
-        if (!usedDependencies.isEmpty()) {
+        Set<String> unusedDependencies = dependencyTracker.getUnusedDependencies();
+        report.append(unusedDependencies.size()).append(" dependencies not used by JSPs:\n");
+        if (!unusedDependencies.isEmpty()) {
             report.append("---------------------------------------------------------------\n");
-            for (String id: usedDependencies) {
+            for (String id: unusedDependencies) {
                 report.append(id).append("\n");
             }
         }
@@ -504,10 +567,8 @@ public class JspcMojo extends AbstractMojo implements Options {
         // create the package list that are double defined
         int doubleDefined = 0;
         StringBuilder msg = new StringBuilder();
-        packages = new ArrayList<String>(artifactsByPackage.keySet());
-        Collections.sort(packages);
         for (String packageName: packages) {
-            Set<String> a = artifactsByPackage.get(packageName);
+            Set<String> a = packageProviders.get(packageName);
             if (a != null && a.size() > 1) {
                 doubleDefined++;
                 msg.append(StringUtils.rightPad(packageName, pad));
@@ -515,45 +576,72 @@ public class JspcMojo extends AbstractMojo implements Options {
             }
         }
         report.append("\n");
-        report.append(doubleDefined).append(" packages are multiply defined by dependencies:\n");
+        report.append(doubleDefined).append(" packages are defined by multiple dependencies:\n");
         if (doubleDefined > 0) {
             report.append("---------------------------------------------------------------\n");
             report.append(msg);
         }
 
+        Map<String, Set<String>> jspDependencies = dependencyTracker.getJspDependencies();
+        if (!jspDependencies.isEmpty()) {
+            pad = 10;
+            List<String> jspsWithDependencies = new ArrayList<>(jspDependencies.keySet());
+            for (String jsp : jspsWithDependencies) {
+                pad = Math.max(pad, jsp.length());
+            }
+            pad += 2;
+            report.append("\n");
+            report.append(StringUtils.rightPad("JSP", pad)).append("Dependencies");
+            report.append("\n---------------------------------------------------------------\n");
+            Collections.sort(jspsWithDependencies);
+            for (String jsp : jspsWithDependencies) {
+                report.append(StringUtils.rightPad(jsp, pad));
+                report.append(String.join(", ", jspDependencies.get(jsp)));
+            }
+
+        }
         getLog().info(report);
     }
 
-    /**
-     * Scans the given artifact for classes and add their packages to the given map.
-     * @param artifactsByPackage the package to artifact lookup map
-     * @param a the artifact to scan
-     */
-    private void scanArtifactPackages(Map<String, Set<String>> artifactsByPackage, Artifact a) {
-        try (JarFile jar = new JarFile(a.getFile())) {
-            Enumeration<JarEntry> entries = jar.entries();
-            while (entries.hasMoreElements()) {
-                JarEntry e = entries.nextElement();
-                if (e.isDirectory()) {
-                    continue;
+    private void generateCompilationReport(DependencyTracker dependencyTracker) {
+        JsonObjectBuilder jsonObjectBuilder = Json.createObjectBuilder();
+        JsonArrayBuilder providers = Json.createArrayBuilder();
+        JsonArrayBuilder jsps = Json.createArrayBuilder();
+        dependencyTracker.getPackageProviders().forEach(
+                (pkg, providersForPackage) -> {
+                    JsonArrayBuilder providersForPackageBuilder = Json.createArrayBuilder(providersForPackage);
+                    JsonObject provider = Json.createObjectBuilder()
+                            .add("package", pkg)
+                            .add("providers", providersForPackageBuilder)
+                            .build();
+                    providers.add(provider);
                 }
-                String path = e.getName();
-                if (path.endsWith(".class")) {
-                    path = StringUtils.chomp(path, "/");
-                    if (path.charAt(0) == '/') {
-                        path = path.substring(1);
-                    }
-                    String packageName = path.replaceAll("/", ".");
-                    Set<String> artifacts = artifactsByPackage.get(packageName);
-                    if (artifacts == null) {
-                        artifacts = new HashSet<String>();
-                        artifactsByPackage.put(packageName, artifacts);
-                    }
-                    artifacts.add(a.getId());
+        );
+        dependencyTracker.getJspDependencies().forEach(
+                (jsp, dependencies) -> {
+                    JsonArrayBuilder dependenciesBuilder = Json.createArrayBuilder(dependencies);
+                    JsonObject jspDependency = Json.createObjectBuilder()
+                            .add("jsp", jsp)
+                            .add("dependencies", dependenciesBuilder)
+                            .build();
+                    jsps.add(jspDependency);
                 }
-            }
+        );
+        JsonArrayBuilder unusedDependencies = Json.createArrayBuilder(dependencyTracker.getUnusedDependencies());
+        Path compilationReportPath = Paths.get(project.getBuild().getOutputDirectory(), COMPILATION_REPORT);
+        Map<String, Object> properties = new HashMap<>(1);
+        properties.put(JsonGenerator.PRETTY_PRINTING, true);
+        JsonWriterFactory writerFactory = Json.createWriterFactory(properties);
+        try (JsonWriter jsonWriter = writerFactory.createWriter(Files.newBufferedWriter(compilationReportPath, StandardCharsets.UTF_8))) {
+            jsonWriter.writeObject(
+                    jsonObjectBuilder
+                            .add("packageProviders", providers.build())
+                            .add("jspDependencies", jsps.build())
+                            .add("unusedDependencies", unusedDependencies.build())
+                            .build()
+            );
         } catch (IOException e) {
-            getLog().error("Error while accessing jar file: " + e.getMessage());
+            getLog().error("Cannot generate the " + COMPILATION_REPORT + " file.", e);
         }
     }
 
