@@ -28,7 +28,7 @@
     </parent>
 
     <artifactId>jspc-maven-plugin</artifactId>
-    <version>2.3.0</version>
+    <version>2.3.1-SNAPSHOT</version>
     <packaging>maven-plugin</packaging>
 
     <name>Apache Sling JSPC Maven Plugin</name>
@@ -39,7 +39,7 @@
         <connection>scm:git:https://gitbox.apache.org/repos/asf/sling-jspc-maven-plugin.git</connection>
         <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/sling-jspc-maven-plugin.git</developerConnection>
         <url>https://gitbox.apache.org/repos/asf?p=sling-jspc-maven-plugin.git</url>
-      <tag>jspc-maven-plugin-2.3.0</tag>
+      <tag>HEAD</tag>
     </scm>
 
     <properties>
@@ -157,7 +157,7 @@
         <dependency>
             <groupId>org.apache.sling</groupId>
             <artifactId>org.apache.sling.scripting.jsp</artifactId>
-            <version>2.5.4</version>
+            <version>2.5.5-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
