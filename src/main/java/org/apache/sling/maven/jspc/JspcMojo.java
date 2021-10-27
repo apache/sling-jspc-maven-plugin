@@ -520,14 +520,21 @@ public class JspcMojo extends AbstractMojo implements Options {
             initClassLoader();
         }
 
-        context = new JspCServletContext(getLog(), new URL("file:" + uriSourceRoot.replace('\\', '/') + '/'));
+
+
+        tldLocationsCache = featureSupport != null ? featureSupport.getTldLocationsCache() : new JspCTldLocationsCache(true, loader);
+
+        context = new JspCServletContext(getLog(), new URL("file:" + uriSourceRoot.replace('\\', '/') + '/'), tldLocationsCache);
         for (File resourceDir: resourceDirectories) {
             String root = resourceDir.getCanonicalPath().replace('\\', '/');
             URL altUrl = new URL("file:" + root + "/");
             context.addAlternativeBaseURL(altUrl);
         }
 
-        tldLocationsCache = featureSupport != null ? featureSupport.getTldLocationsCache() : new JspCTldLocationsCache(context, true, loader);
+
+        if (tldLocationsCache instanceof JspCTldLocationsCache) {
+            ((JspCTldLocationsCache) tldLocationsCache).init(context);
+        }
 
         JavaCompiler compiler = new EclipseJavaCompiler();
         ClassLoaderWriter writer = new JspCClassLoaderWriter(loader, new File(outputDirectory));

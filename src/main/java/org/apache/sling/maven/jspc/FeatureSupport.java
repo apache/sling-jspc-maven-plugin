@@ -78,7 +78,12 @@ public class FeatureSupport {
 
         properties = frameworkPropertiesHandler.apply(properties);
 
-        Framework framework = factory.newFramework(properties);
+        Map<String, String> frameworkProperties = new HashMap<>();
+        properties.forEach((key, value) -> {
+            frameworkProperties.put(key, value.replace("{dollar}", "$"));
+        });
+
+        Framework framework = factory.newFramework(frameworkProperties);
 
         framework.init();
 
