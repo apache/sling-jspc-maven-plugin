@@ -16,14 +16,15 @@
  */
 package org.apache.sling.maven.jspc;
 
-import java.io.InputStream;
+import org.osgi.framework.BundleReference;
+
+import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Set;
-
-import org.codehaus.plexus.util.StringUtils;
 
 /**
  * Classloader that tracks which classes are loaded.
@@ -59,10 +60,43 @@ public class TrackingClassLoader extends URLClassLoader {
      */
     @Override
     public Class<?> loadClass(final String name) throws ClassNotFoundException {
-        final Class<?> c = super.loadClass(name);
+        return loadClass(name, false);
+    }
+
+    /**
+     * @see java.lang.ClassLoader#loadClass(java.lang.String,boolean)
+     */
+    @Override
+    public Class<?> loadClass(final String name, boolean resolve) throws ClassNotFoundException {
+        final Class<?> c = super.loadClass(name, resolve);
+        if (c.getClassLoader() instanceof BundleReference) {
+            this.classNames.add(name);
+            this.packageNames.add(c.getPackage().getName());
+        }
+        return c;
+    }
+
+    @Override
+    protected Class<?> findClass(String name) throws ClassNotFoundException {
+        final Class<?> c = super.findClass(name);
         this.classNames.add(name);
         this.packageNames.add(c.getPackage().getName());
         return c;
+    }
+
+    @Override
+    public URL getResource(String name) {
+        final URL url = super.getResource(name);
+        if (url != null && "bundle".equals(url.getProtocol()) && name.endsWith(".class")) {
+            int lastDot = name.lastIndexOf('.');
+            int lastSlash = name.lastIndexOf('/');
+            String className = name.substring(0, lastDot).replaceAll("/", ".");
+            classNames.add(className);
+            if (lastSlash > 0) {
+                packageNames.add(className.substring(0, lastSlash));
+            }
+        }
+        return url;
     }
 
     @Override
@@ -79,5 +113,4 @@ public class TrackingClassLoader extends URLClassLoader {
         }
         return url;
     }
-
 }

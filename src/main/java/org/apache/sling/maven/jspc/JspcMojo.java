@@ -18,17 +18,21 @@ package org.apache.sling.maven.jspc;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarFile;
 
 import javax.json.Json;
@@ -42,17 +46,29 @@ import javax.json.stream.JsonGenerator;
 import org.apache.commons.logging.impl.LogFactoryImpl;
 import org.apache.commons.logging.impl.SimpleLog;
 import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.DefaultArtifact;
 import org.apache.maven.artifact.DependencyResolutionRequiredException;
+import org.apache.maven.artifact.handler.manager.ArtifactHandlerManager;
+import org.apache.maven.artifact.resolver.ArtifactNotFoundException;
+import org.apache.maven.artifact.resolver.ArtifactResolutionException;
+import org.apache.maven.artifact.versioning.VersionRange;
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.model.Dependency;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugins.annotations.Component;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
+import org.apache.maven.project.MavenProjectHelper;
 import org.apache.sling.commons.classloader.ClassLoaderWriter;
 import org.apache.sling.commons.compiler.JavaCompiler;
 import org.apache.sling.commons.compiler.impl.EclipseJavaCompiler;
+import org.apache.sling.feature.ArtifactId;
+import org.apache.sling.feature.Feature;
+import org.apache.sling.feature.io.json.FeatureJSONReader;
 import org.apache.sling.scripting.jsp.jasper.Constants;
 import org.apache.sling.scripting.jsp.jasper.JasperException;
 import org.apache.sling.scripting.jsp.jasper.JspCompilationContext;
@@ -64,6 +80,7 @@ import org.apache.sling.scripting.jsp.jasper.compiler.TagPluginManager;
 import org.apache.sling.scripting.jsp.jasper.compiler.TldLocationsCache;
 import org.codehaus.plexus.util.DirectoryScanner;
 import org.codehaus.plexus.util.StringUtils;
+import org.apache.maven.artifact.resolver.ArtifactResolver;
 
 /**
  * The <code>JspcMojo</code> is implements the Sling Maven JspC goal
@@ -211,6 +228,21 @@ public class JspcMojo extends AbstractMojo implements Options {
     @Parameter
     private String[] excludes;
 
+    @Parameter
+    private FeatureDependency feature;
+
+    @Parameter(property = "session", defaultValue = "${session}", readonly = true, required = true)
+    protected MavenSession mavenSession;
+
+    @Component
+    protected MavenProjectHelper projectHelper;
+
+    @Component
+    ArtifactHandlerManager artifactHandlerManager;
+
+    @Component
+    ArtifactResolver artifactResolver;
+
     private String uriSourceRoot;
 
     private List<String> pages = new ArrayList<String>();
@@ -228,6 +260,8 @@ public class JspcMojo extends AbstractMojo implements Options {
      */
     private TldLocationsCache tldLocationsCache;
 
+    private FeatureSupport featureSupport;
+
     private JspConfig jspConfig;
 
     private TagPluginManager tagPluginManager;
@@ -235,6 +269,13 @@ public class JspcMojo extends AbstractMojo implements Options {
     private JspCIOProvider ioProvider;
 
     private DependencyTracker dependencyTracker;
+
+    public static final class FeatureDependency {
+        public Artifact featureId;
+        public String featureFile;
+        public List<Dependency> dependencies;
+        public boolean failOnUnresolved;
+    }
 
     /*
      * (non-Javadoc)
@@ -294,6 +335,15 @@ public class JspcMojo extends AbstractMojo implements Options {
             } else {
                 System.setProperty(Constants.JSP_PACKAGE_NAME_PROPERTY_NAME, previousJasperPackageName);
             }
+            if (featureSupport != null) {
+                try {
+                    featureSupport.shutdown(10000);
+                } catch (Exception e) {
+                    getLog().error(e);
+                }
+
+                featureSupport = null;
+            }
         }
 
         project.addCompileSourceRoot(outputDirectory);
@@ -325,10 +375,34 @@ public class JspcMojo extends AbstractMojo implements Options {
         }
 
         try {
+            if (featureSupport == null && feature != null) {
+                File target = null;
+                if (feature.featureId != null) {
+                    target = getOrResolveArtifact(project, mavenSession, artifactHandlerManager, artifactResolver, ArtifactId.fromMvnId(feature.featureId.getId())).getFile();
+                } else if (feature.featureFile != null && ! feature.featureFile.trim().isEmpty()){
+                    target = new File(feature.featureFile);
+                }
+                if (target != null && target.isFile()) {
+                    try (Reader reader = new InputStreamReader(Files.newInputStream(target.toPath()), "UTF-8")) {
+                        Feature assembled = FeatureJSONReader.read(reader, target.getAbsolutePath());
+                        featureSupport = FeatureSupport.createFeatureSupport(assembled, artifactId -> {
+                            try {
+                                return getOrResolveArtifact(project, mavenSession, artifactHandlerManager, artifactResolver, artifactId).getFile().toURI().toURL();
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        }, this.getClass().getClassLoader(), feature.failOnUnresolved, properties -> {
+                            properties.put(org.osgi.framework.Constants.FRAMEWORK_STORAGE_CLEAN, org.osgi.framework.Constants.FRAMEWORK_STORAGE_CLEAN_ONFIRSTINIT);
+                            properties.put(org.osgi.framework.Constants.FRAMEWORK_STORAGE, new File(project.getBuild().getDirectory(), "featuresupport").getAbsolutePath());
+                            properties.put(org.osgi.framework.Constants.FRAMEWORK_BOOTDELEGATION, "*");
+                            return properties;
+                        });
+                    }
+                }
+            }
             if (context == null) {
                 initServletContext();
             }
-
 
             if (printCompilationReport || generateCompilationReport) {
                 dependencyTracker = new DependencyTracker(
@@ -376,6 +450,14 @@ public class JspcMojo extends AbstractMojo implements Options {
                     try {
                         processFile(nextjsp);
                     } catch (JasperException e) {
+                        Throwable rootCause = e;
+                        while (rootCause instanceof JasperException
+                                && ((JasperException) rootCause).getRootCause() != null) {
+                            rootCause = ((JasperException) rootCause).getRootCause();
+                        }
+                        if (rootCause != e) {
+                            rootCause.printStackTrace();
+                        }
                         throw new RuntimeException(e);
                     }
                 }
@@ -383,18 +465,6 @@ public class JspcMojo extends AbstractMojo implements Options {
             if (dependencyTracker != null) {
                 dependencyTracker.processCompileDependencies();
             }
-
-        } catch (JasperException je) {
-            Throwable rootCause = je;
-            while (rootCause instanceof JasperException
-                && ((JasperException) rootCause).getRootCause() != null) {
-                rootCause = ((JasperException) rootCause).getRootCause();
-            }
-            if (rootCause != je) {
-                rootCause.printStackTrace();
-            }
-            throw je;
-
         } catch (/* IO */Exception ioe) {
             throw new JasperException(ioe);
         }
@@ -435,8 +505,11 @@ public class JspcMojo extends AbstractMojo implements Options {
             // just log otherwise
             getLog().error(je.getMessage());
 
-        } catch (Exception e) {
-            throw new JasperException(e);
+        } catch (Throwable e) {
+            if (failOnError) {
+                throw new JasperException(e);
+            }
+            getLog().error(e.getMessage(), e);
         }
     }
 
@@ -447,14 +520,21 @@ public class JspcMojo extends AbstractMojo implements Options {
             initClassLoader();
         }
 
-        context = new JspCServletContext(getLog(), new URL("file:" + uriSourceRoot.replace('\\', '/') + '/'));
+
+
+        tldLocationsCache = featureSupport != null ? featureSupport.getTldLocationsCache() : new JspCTldLocationsCache(true, loader);
+
+        context = new JspCServletContext(getLog(), new URL("file:" + uriSourceRoot.replace('\\', '/') + '/'), tldLocationsCache);
         for (File resourceDir: resourceDirectories) {
             String root = resourceDir.getCanonicalPath().replace('\\', '/');
             URL altUrl = new URL("file:" + root + "/");
             context.addAlternativeBaseURL(altUrl);
         }
 
-        tldLocationsCache = new JspCTldLocationsCache(context, true, loader);
+
+        if (tldLocationsCache instanceof JspCTldLocationsCache) {
+            ((JspCTldLocationsCache) tldLocationsCache).init(context);
+        }
 
         JavaCompiler compiler = new EclipseJavaCompiler();
         ClassLoaderWriter writer = new JspCClassLoaderWriter(loader, new File(outputDirectory));
@@ -478,32 +558,49 @@ public class JspcMojo extends AbstractMojo implements Options {
         final String targetDirectory = project.getBuild().getOutputDirectory();
         classPath.add(new File(targetDirectory).toURI().toURL());
 
-        // add artifacts from project
-        Set<Artifact> artifacts = project.getArtifacts();
-        jspcCompileArtifacts = new ArrayList<Artifact>(artifacts.size());
-        for (Artifact a: artifacts) {
-            final String scope = a.getScope();
-            if ("provided".equals(scope) || "runtime".equals(scope) || "compile".equals(scope)) {
-                // we need to exclude the javax.servlet.jsp API, otherwise the taglib parser causes problems (see note below)
-                if (containsProblematicPackage(a.getFile())) {
-                    continue;
+
+        jspcCompileArtifacts = new ArrayList<>();
+
+        if (featureSupport != null) {
+            if (feature.dependencies != null) {
+                for (Dependency dependency : feature.dependencies) {
+                    Artifact artifact = getOrResolveArtifact(project, mavenSession, artifactHandlerManager, artifactResolver, new ArtifactId(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), dependency.getClassifier(), dependency.getType()));
+                    classPath.add(artifact.getFile().toURI().toURL());
+                    jspcCompileArtifacts.add(artifact);
                 }
-                classPath.add(a.getFile().toURI().toURL());
-                jspcCompileArtifacts.add(a);
             }
-        }
+            featureSupport.getFeature().getBundles().stream()
+                    .map(bundle -> bundle.getId())
+                    .map(dependency -> getOrResolveArtifact(project, mavenSession, artifactHandlerManager, artifactResolver, new ArtifactId(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), dependency.getClassifier(), dependency.getType())))
+                    .forEachOrdered(jspcCompileArtifacts::add);
 
-        if (getLog().isDebugEnabled()) {
-            getLog().debug("Compiler classpath:");
-            for (URL u: classPath) {
-                getLog().debug("  " + u);
+            loader = new TrackingClassLoader(classPath.toArray(new URL[classPath.size()]), featureSupport.getClassLoader());
+        } else {
+            // add artifacts from project
+            Set<Artifact> artifacts = project.getArtifacts();
+            for (Artifact a: artifacts) {
+                final String scope = a.getScope();
+                if ("provided".equals(scope) || "runtime".equals(scope) || "compile".equals(scope)) {
+                    // we need to exclude the javax.servlet.jsp API, otherwise the taglib parser causes problems (see note below)
+                    if (containsProblematicPackage(a.getFile())) {
+                        continue;
+                    }
+                    classPath.add(a.getFile().toURI().toURL());
+                    jspcCompileArtifacts.add(a);
+                }
             }
-        }
 
-        // this is dangerous to use this classloader as parent as the compilation will depend on the classes provided
-        // in the plugin dependencies. but if we omit this, we get errors by not being able to load the TagExtraInfo classes.
-        // this is because this plugin uses classes from the javax.servlet.jsp that are also loaded via the TLDs.
-        loader = new TrackingClassLoader(classPath.toArray(new URL[classPath.size()]), this.getClass().getClassLoader());
+            if (getLog().isDebugEnabled()) {
+                getLog().debug("Compiler classpath:");
+                for (URL u: classPath) {
+                    getLog().debug("  " + u);
+                }
+            }
+            // this is dangerous to use this classloader as parent as the compilation will depend on the classes provided
+            // in the plugin dependencies. but if we omit this, we get errors by not being able to load the TagExtraInfo classes.
+            // this is because this plugin uses classes from the javax.servlet.jsp that are also loaded via the TLDs.
+            loader = new TrackingClassLoader(classPath.toArray(new URL[classPath.size()]), this.getClass().getClassLoader());
+        }
     }
 
     /**
@@ -851,5 +948,55 @@ public class JspcMojo extends AbstractMojo implements Options {
     public boolean getDisplaySourceFragment() {
         // Display the source fragment on errors for maven compilation
         return true;
+    }
+
+    private static final ConcurrentHashMap<String, Artifact> cache = new ConcurrentHashMap<>();
+
+    public static Artifact getOrResolveArtifact(final MavenProject project,
+                                                final MavenSession session,
+                                                final ArtifactHandlerManager artifactHandlerManager,
+                                                final ArtifactResolver resolver,
+                                                final ArtifactId id) {
+        @SuppressWarnings("unchecked")
+        Artifact result = cache.get(id.toMvnId());
+        if ( result == null ) {
+            result = findArtifact(id, project.getAttachedArtifacts());
+            if ( result == null ) {
+                result = findArtifact(id, project.getArtifacts());
+                if ( result == null ) {
+                    final Artifact prjArtifact = new DefaultArtifact(id.getGroupId(),
+                            id.getArtifactId(),
+                            VersionRange.createFromVersion(id.getVersion()),
+                            Artifact.SCOPE_PROVIDED,
+                            id.getType(),
+                            id.getClassifier(),
+                            artifactHandlerManager.getArtifactHandler(id.getType()));
+                    try {
+                        resolver.resolve(prjArtifact, project.getRemoteArtifactRepositories(), session.getLocalRepository());
+                    } catch (final ArtifactResolutionException | ArtifactNotFoundException e) {
+                        throw new RuntimeException("Unable to get artifact for " + id.toMvnId(), e);
+                    }
+                    result = prjArtifact;
+                }
+            }
+            cache.put(id.toMvnId(), result);
+        }
+
+        return result;
+    }
+
+    private static Artifact findArtifact(final ArtifactId id, final Collection<Artifact> artifacts) {
+        if (artifacts != null) {
+            for(final Artifact artifact : artifacts) {
+                if ( artifact.getGroupId().equals(id.getGroupId())
+                        && artifact.getArtifactId().equals(id.getArtifactId())
+                        && artifact.getVersion().equals(id.getVersion())
+                        && artifact.getType().equals(id.getType())
+                        && ((id.getClassifier() == null && artifact.getClassifier() == null) || (id.getClassifier() != null && id.getClassifier().equals(artifact.getClassifier()))) ) {
+                    return artifact.getFile() == null ? null : artifact;
+                }
+            }
+        }
+        return null;
     }
 }

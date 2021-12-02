@@ -1,0 +1,4 @@
+{
+  "id": "org.foo:bar:slingosgifeature:0.0.1-SNAPSHOT",
+  "bundles": ["org.apache.sling:jspc-maven-plugin-it-deps:0.0.1"]
+}

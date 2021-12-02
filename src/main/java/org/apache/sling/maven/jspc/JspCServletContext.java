@@ -44,6 +44,8 @@ import javax.servlet.descriptor.JspConfigDescriptor;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.maven.plugin.logging.Log;
+import org.apache.sling.scripting.jsp.jasper.JasperException;
+import org.apache.sling.scripting.jsp.jasper.compiler.TldLocationsCache;
 
 /**
  * Simple <code>ServletContext</code> implementation without HTTP-specific
@@ -65,6 +67,7 @@ public class JspCServletContext implements ServletContext {
      * "/WEB-INF/web.xml").
      */
     private static final String WEB_XML = "/WEB-INF/web.xml";
+    private final TldLocationsCache tldLocationsCache;
 
     /**
      * Servlet context attributes.
@@ -88,11 +91,12 @@ public class JspCServletContext implements ServletContext {
 
     /**
      * Create a new instance of this ServletContext implementation.
-     *
-     * @param log The Log which is used for <code>log()</code> calls
+     *  @param log The Log which is used for <code>log()</code> calls
      * @param resourceBaseURL Resource base URL
+     * @param tldLocationsCache
      */
-    public JspCServletContext(Log log, URL resourceBaseURL) {
+    public JspCServletContext(Log log, URL resourceBaseURL, TldLocationsCache tldLocationsCache) {
+        this.tldLocationsCache = tldLocationsCache;
         this.attributes = new Hashtable<>();
         this.log = log;
         this.resourceBaseURL = resourceBaseURL;
@@ -240,6 +244,22 @@ public class JspCServletContext implements ServletContext {
         }
 
         if (!path.startsWith("/")) {
+            if (path.startsWith("tld:")) {
+                int cs = path.indexOf(":/");
+                if (cs > 0 && cs < path.length()-2) {
+                    // insert second slash after scheme (was canonicalized away)
+                    cs += 2;
+                    if (cs < path.length() && path.charAt(cs) != '/') {
+                        path = path.substring(0, cs) + "/" + path.substring(cs);
+                    }
+                }
+                try {
+                    String[] location = tldLocationsCache.getLocation(path.substring("tld:".length()));
+                    if (location != null && location[0].equals(path)) {
+                        return new URL(location[1]);
+                    }
+                } catch (Exception e) {}
+            }
             throw new MalformedURLException("Path '" + path + "' does not start with '/'");
         }
 

@@ -17,6 +17,7 @@
 
 package org.apache.sling.maven.jspc;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.JarURLConnection;
 import java.net.MalformedURLException;
@@ -108,7 +109,6 @@ public class JspCTldLocationsCache extends TldLocationsCache {
      */
     private final Map<String, String[]> mappings;
 
-    private final ServletContext ctxt;
     private final boolean redeployMode;
 
     private final ClassLoader webappLoader;
@@ -172,14 +172,12 @@ public class JspCTldLocationsCache extends TldLocationsCache {
     /**
      * Constructor.
      *
-     * @param ctxt         the servlet context of the web application in which Jasper is running
      * @param redeployMode if true, then the compiler will allow redeploying a tag library from the same jar, at the expense of slowing down
      *                     the server a bit. Note that this may only work on JDK 1.3.1_01a and later, because of JDK bug 4211817 fixed in
      *                     this release. If redeployMode is false, a faster but less capable mode will be used.
      * @param loader       the classloader to use
      */
-    public JspCTldLocationsCache(ServletContext ctxt, boolean redeployMode, ClassLoader loader) {
-        this.ctxt = ctxt;
+    public JspCTldLocationsCache(boolean redeployMode, ClassLoader loader) {
         this.redeployMode = redeployMode;
         mappings = new ConcurrentHashMap<>();
         initialized = false;
@@ -219,9 +217,6 @@ public class JspCTldLocationsCache extends TldLocationsCache {
      * in the web application.
      */
     public String[] getLocation(String uri) throws JasperException {
-        if (!initialized) {
-            init();
-        }
         return mappings.get(uri);
     }
 
@@ -272,16 +267,16 @@ public class JspCTldLocationsCache extends TldLocationsCache {
         }
     }
 
-    private synchronized void init() throws JasperException {
+    synchronized void init(ServletContext ctxt) throws IOException {
         if (initialized) return;
         try {
-            processWebDotXml();
+            processWebDotXml(ctxt);
             scanJars();
-            processTldsInFileSystem("/WEB-INF/");
-            processTldsInFileSystem("/META-INF/");
+            processTldsInFileSystem("/WEB-INF/", ctxt);
+            processTldsInFileSystem("/META-INF/", ctxt);
             initialized = true;
         } catch (Exception ex) {
-            throw new JasperException(Localizer.getMessage(
+            throw new IOException(Localizer.getMessage(
                     "jsp.error.internal.tldinit", ex.getMessage()));
         }
     }
@@ -289,7 +284,7 @@ public class JspCTldLocationsCache extends TldLocationsCache {
     /*
      * Populates taglib map described in web.xml.
      */
-    private void processWebDotXml() throws Exception {
+    private void processWebDotXml(ServletContext ctxt) throws Exception {
 
         InputStream is = null;
 
@@ -449,7 +444,7 @@ public class JspCTldLocationsCache extends TldLocationsCache {
      * an implicit map entry to the taglib map for any TLD that has a &lt;uri&gt;
      * element.
      */
-    private void processTldsInFileSystem(String startPath)
+    private void processTldsInFileSystem(String startPath, ServletContext ctxt)
             throws Exception {
 
         Set dirList = ctxt.getResourcePaths(startPath);
@@ -457,7 +452,7 @@ public class JspCTldLocationsCache extends TldLocationsCache {
             for (Object aDirList : dirList) {
                 String path = (String) aDirList;
                 if (path.endsWith("/")) {
-                    processTldsInFileSystem(path);
+                    processTldsInFileSystem(path, ctxt);
                 }
                 if (!path.endsWith(".tld")) {
                     continue;
