@@ -23,7 +23,7 @@
     <parent>
         <groupId>org.apache.sling</groupId>
         <artifactId>sling</artifactId>
-        <version>41</version>
+        <version>46</version>
         <relativePath />
     </parent>
 
@@ -46,6 +46,7 @@
         <maven.site.path>${project.artifactId}-archives/${project.artifactId}-LATEST</maven.site.path>
         <site.jira.version.id>12313225,12313347,12319479,12319561,12325751,12347153,12348438,12348556,12350208</site.jira.version.id>
         <maven.version>3.5.0</maven.version>
+        <project.build.outputTimestamp>1</project.build.outputTimestamp>
     </properties>
 
     <prerequisites>
