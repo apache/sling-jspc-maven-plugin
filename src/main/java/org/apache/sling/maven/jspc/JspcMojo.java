@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -581,8 +582,8 @@ public class JspcMojo extends AbstractMojo implements Options {
             for (Artifact a: artifacts) {
                 final String scope = a.getScope();
                 if ("provided".equals(scope) || "runtime".equals(scope) || "compile".equals(scope)) {
-                    // we need to exclude the javax.servlet.jsp API, otherwise the taglib parser causes problems (see note below)
-                    if (containsProblematicPackage(a.getFile())) {
+                    // we need to exclude the javax.servlet.jsp API and non jar files, otherwise the taglib parser causes problems (see note below)
+                    if (isNotJarFile(a.getFile().toPath()) || containsProblematicPackage(a.getFile())) {
                         continue;
                     }
                     classPath.add(a.getFile().toURI().toURL());
@@ -601,6 +602,13 @@ public class JspcMojo extends AbstractMojo implements Options {
             // this is because this plugin uses classes from the javax.servlet.jsp that are also loaded via the TLDs.
             loader = new TrackingClassLoader(classPath.toArray(new URL[classPath.size()]), this.getClass().getClassLoader());
         }
+    }
+
+    private boolean isNotJarFile(Path path) throws IOException {
+        String contentType = Files.probeContentType(path);
+
+        return !Arrays.asList("application/java-archive", "application/x-java-archive", "application/x-jar")
+                .contains(contentType);
     }
 
     /**
