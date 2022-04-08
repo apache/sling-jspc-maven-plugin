@@ -44,7 +44,7 @@
 
     <properties>
         <maven.site.path>${project.artifactId}-archives/${project.artifactId}-LATEST</maven.site.path>
-        <site.jira.version.id>12313225,12313347,12319479,12319561,12325751,12347153,12348438,12348556,12350208</site.jira.version.id>
+        <site.jira.version.id>12313225,12313347,12319479,12319561,12325751,12347153,12348438,12348556,12350208,12350392,12351287</site.jira.version.id>
         <maven.version>3.5.0</maven.version>
         <project.build.outputTimestamp>1</project.build.outputTimestamp>
     </properties>
@@ -252,6 +252,10 @@
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
+            <artifactId>maven-compat</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.maven</groupId>
             <artifactId>maven-archiver</artifactId>
             <version>3.1.1</version>
         </dependency>
@@ -297,16 +301,6 @@
             <artifactId>maven-plugin-testing-harness</artifactId>
             <version>3.3.0</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.maven</groupId>
-            <artifactId>maven-compat</artifactId>
-            <scope>test</scope>
-            <version>${maven.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.maven</groupId>
-            <artifactId>maven-compat</artifactId>
         </dependency>
     </dependencies>
 </project>
