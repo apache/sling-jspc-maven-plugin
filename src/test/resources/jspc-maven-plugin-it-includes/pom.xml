@@ -64,5 +64,11 @@
             <artifactId>jspc-maven-plugin-it-deps</artifactId>
             <version>0.0.1</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.sling</groupId>
+            <artifactId>jspc-maven-plugin-it-deps</artifactId>
+            <version>0.0.1</version>
+            <type>random</type>
+        </dependency>
     </dependencies>
 </project>

@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.jar.JarFile;
+import java.util.stream.Collectors;
 
 import javax.json.Json;
 import javax.json.JsonArrayBuilder;
@@ -577,7 +578,8 @@ public class JspcMojo extends AbstractMojo implements Options {
             loader = new TrackingClassLoader(classPath.toArray(new URL[classPath.size()]), featureSupport.getClassLoader());
         } else {
             // add artifacts from project
-            Set<Artifact> artifacts = project.getArtifacts();
+            Set<Artifact> artifacts = project.getArtifacts().stream().filter(artifact -> "jar".equalsIgnoreCase(artifact.getType())).collect(
+                    Collectors.toSet());
             for (Artifact a: artifacts) {
                 final String scope = a.getScope();
                 if ("provided".equals(scope) || "runtime".equals(scope) || "compile".equals(scope)) {
