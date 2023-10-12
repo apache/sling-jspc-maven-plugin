@@ -38,7 +38,7 @@
     <scm>
         <connection>scm:git:https://gitbox.apache.org/repos/asf/sling-jspc-maven-plugin.git</connection>
         <developerConnection>scm:git:https://gitbox.apache.org/repos/asf/sling-jspc-maven-plugin.git</developerConnection>
-        <url>https://gitbox.apache.org/repos/asf?p=sling-jspc-maven-plugin.git</url>
+        <url>https://github.com/apache/sling-jspc-maven-plugin.git</url>
       <tag>HEAD</tag>
     </scm>
 
